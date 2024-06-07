@@ -6,6 +6,9 @@
 # manually sourced libraries
 lib/*
 
+# custom vscode stuff
+.vscode
+
 # dotenv files
 .env
 

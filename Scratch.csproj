@@ -27,5 +27,11 @@
     <Reference Include="UnityEngine">
       <HintPath>lib/UnityEngine.dll</HintPath>
     </Reference>
+    <Reference Include="Cinemachine">
+      <HintPath>lib/Cinemachine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>lib/UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>
