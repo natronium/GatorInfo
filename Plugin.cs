@@ -1,4 +1,6 @@
-﻿using BepInEx;
+﻿using System.Collections.Generic;
+using System.Linq;
+using BepInEx;
 using Cinemachine;
 using Mono.Cecil;
 using Unity.Collections;
@@ -31,6 +33,9 @@ namespace Scratch
         private static CinemachineBrain brain;
         private static new Camera camera;
         private static bool isSnapped = false;
+        private static List<GameObject> markers = [];
+
+        private static bool killedCuller = false;
 
         public static void Snapshot()
         {
@@ -53,7 +58,7 @@ namespace Scratch
         }
         public static void Restore()
         {
-            
+
             terrain.basemapDistance = oBaseMapDist;
             tf.eulerAngles = oAngle;
             tf.position = oPos;
@@ -64,6 +69,11 @@ namespace Scratch
             camera.farClipPlane = oFarClip;
             RenderSettings.fog = true;
             QualitySettings.lodBias = oLodBias;
+
+            foreach (var marker in markers)
+            {
+                Object.Destroy(marker);
+            }
         }
 
         public static void DoTheThing(bool restore = false)
@@ -80,14 +90,65 @@ namespace Scratch
             terrain.basemapDistance = 500;
             QualitySettings.lodBias = 100_000f;
 
+            if (!killedCuller)
+            {
+                killedCuller = true;
+                var culler = GameObject.FindObjectOfType<ManualDistanceCulling>();
+                culler.gameObject.SetActive(false);
+                foreach (var chunk in culler.chunks)
+                {
+                    foreach (var obj in chunk.expensiveChunkObjects)
+                    {
+                        obj.SetActive(true);
+                    }
+                    foreach (var ro in chunk.resistantObjects)
+                    {
+                        ro.gameObject.SetActive(true);
+                    }
+                    foreach (var obj in chunk.chunkObjects)
+                    {
+                        obj.SetActive(true);
+                    }
+                }
+            }
 
             //NB: no colons allowed in windows filenames
-            SnapPic(camera, $"{System.DateTime.Now.ToString("s").Replace(':', '-')}-snap", RenderTextureFormat.ARGB32);
-            //TODO: how to depth?? depth would be sweet? or maybe some other trick for doing a heightmap??
-            //SnapPic(camera, $"{System.DateTime.Now.ToString("s").Replace(':', '-')}-depth", RenderTextureFormat.Depth);
+            //SnapPic(camera, $"{System.DateTime.Now.ToString("s").Replace(':', '-')}-snap", RenderTextureFormat.ARGB32);
+
+            var potPrefabs = Resources.FindObjectsOfTypeAll<ParticlePickup>()
+                .Where(e => e.name.Equals("Pot Confetti"))
+                .Select(e => e.gameObject.transform.parent.gameObject);
+
+
+            var breakables = Object.FindObjectsOfType<BreakableObject>();
+            var potPositions = breakables.Where(breakable => potPrefabs.Contains(breakable.breakingPrefab)).Select(breakable => breakable.transform.position);
+            var chestPositions = Object.FindObjectsOfType<BreakableObjectMulti>().Select(bom => bom.transform.position);
+            var paths = Object.FindObjectsOfType<ActorPathFollower>();
+            //var NPCs = //uhhhh i really dunno for this one
+
+            foreach (Vector3 potPos in potPositions)
+            {
+                var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                marker.transform.position = new(potPos.x, 90, potPos.z);
+                marker.transform.localScale *= 5;
+                marker.GetComponent<Renderer>().material.color = Color.cyan;
+                markers.Add(marker);
+            }
+            foreach (Vector3 chestPos in chestPositions)
+            {
+                var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                marker.transform.position = new(chestPos.x, 90, chestPos.z);
+                marker.transform.localScale *= 5;
+                marker.GetComponent<Renderer>().material.color = Color.magenta;
+                markers.Add(marker);
+            }
+
+            SnapPic(camera, $"{System.DateTime.Now.ToString("s").Replace(':', '-')}-markers", RenderTextureFormat.ARGB32);
+
 
             //restore
-            if (restore) {
+            if (restore)
+            {
                 Restore();
             }
 
