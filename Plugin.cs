@@ -6,6 +6,7 @@ using Mono.Cecil;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.SearchService;
 
 namespace Scratch
 {
@@ -124,6 +125,7 @@ namespace Scratch
             var potPositions = breakables.Where(breakable => potPrefabs.Contains(breakable.breakingPrefab)).Select(breakable => breakable.transform.position);
             var chestPositions = Object.FindObjectsOfType<BreakableObjectMulti>().Select(bom => bom.transform.position);
             var paths = Object.FindObjectsOfType<ActorPathFollower>();
+            var racePositions = Object.FindObjectsOfType<Racetrack>().Select(racetrack => racetrack.transform.position);
             //var NPCs = //uhhhh i really dunno for this one
 
             foreach (Vector3 potPos in potPositions)
@@ -140,6 +142,14 @@ namespace Scratch
                 marker.transform.position = new(chestPos.x, 90, chestPos.z);
                 marker.transform.localScale *= 5;
                 marker.GetComponent<Renderer>().material.color = Color.magenta;
+                markers.Add(marker);
+            }
+            foreach (Vector3 racePos in racePositions) {
+                var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                marker.transform.position = new(racePos.x, 90, racePos.z);
+                marker.transform.localScale *= 5;
+                marker.transform.Rotate(0, 45, 0);
+                marker.GetComponent<Renderer>().material.color = Color.red;
                 markers.Add(marker);
             }
 
