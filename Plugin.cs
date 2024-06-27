@@ -21,7 +21,11 @@ namespace Scratch
             // Plugin startup logic
             Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
             Logger.LogDebug("FLORGLE!");
-            StartCoroutine(WaitThenRun(1, DoTheThing));
+
+            LogStuffPositions();
+            // has to happen out here so we can wait for a bit for the trees to fade back in
+            Game.State = GameState.Menu; // Render tree canopies (technically sets the proximityfade shader var)
+            StartCoroutine(WaitThenRun(5, DoTheThing));
         }
 
         private void OnDestroy()
@@ -94,7 +98,61 @@ namespace Scratch
             }
         }
 
+        public void LogStuffPositions()
+        {
+            var potPrefabs = Resources.FindObjectsOfTypeAll<ParticlePickup>()
+                .Where(e => e.name.Equals("Pot Confetti"))
+                .Select(e => e.gameObject.transform.parent.gameObject);
 
+
+            var breakables = Object.FindObjectsOfType<BreakableObject>();
+            var potPositions = breakables.Where(breakable => potPrefabs.Contains(breakable.breakingPrefab)).Select(breakable => breakable.transform.position);
+            var chestPositions = Object.FindObjectsOfType<BreakableObjectMulti>().Select(bom => bom.transform.position);
+            var racePositions = Object.FindObjectsOfType<Racetrack>().Select(racetrack => racetrack.transform.position);
+
+            Logger.LogDebug("let pot_positions = [");
+            foreach (Vector3 pos in potPositions)
+            {
+                Logger.LogDebug($"[{pos.z},{pos.x}],");
+            }
+            Logger.LogDebug("];");
+            Logger.LogDebug("let chest_positions = [");
+            foreach (Vector3 pos in chestPositions)
+            {
+                Logger.LogDebug($"[{pos.z},{pos.x}],");
+            }
+            Logger.LogDebug("];");
+            Logger.LogDebug("let race_positions = [");
+            foreach (Vector3 pos in racePositions)
+            {
+               Logger.LogDebug($"[{pos.z},{pos.x}],");
+            }
+            Logger.LogDebug("];");
+            Logger.LogDebug("let npc_positions = [");
+            foreach (var npc in CompletionStats.c.completionActors){
+                var pos = npc.transform.position;
+                Logger.LogDebug($"[{pos.z},{pos.x}],");
+            }
+            Logger.LogDebug("];");
+            Logger.LogDebug("let npc_path_positions = [");
+            var paths = Resources.FindObjectsOfTypeAll<ActorPath>();
+            foreach (var path in paths)
+            {
+                Logger.LogDebug($"L.polyline([");
+                for (int i = 0; i < path.positions.Length; i++)
+                {
+                    var pos = path.GetPosition(i);
+                    Logger.LogDebug($"[{pos.z},{pos.x}],");
+                }
+                if (path.connectEnds)
+                {
+                    var pos = path.GetPosition(0);
+                    Logger.LogDebug($"[{pos.z},{pos.x}],");
+                }
+                Logger.LogDebug($"]),");
+            }
+            Logger.LogDebug("];");
+        }
 
         public void DoTheThing(/* bool restore = false */)
         {
@@ -113,8 +171,17 @@ namespace Scratch
             tf.position = topLeft; //determined empirically NB: needs to be above highest point on island to prevent clipping
             tf.eulerAngles = new Vector3(90, 0, 0);
             terrain.basemapDistance = 500;
+            terrain.heightmapPixelError = 0;
             terrain.detailObjectDistance = 500;
             QualitySettings.lodBias = 100_000f;
+
+            // shadows actually look kinda bad in the map context
+            // GameObject.FindObjectOfType<Light>().layerShadowCullDistances = Enumerable.Repeat(0f, 32).ToArray(); //always shadows!
+            // QualitySettings.shadowDistance = 960;
+            camera.layerCullDistances = Enumerable.Repeat(0f, 32).ToArray(); //cull nothing!!
+            camera.GetComponent<UnityEngine.Rendering.PostProcessing.PostProcessLayer>().enabled = false; //changes the screen color based on camera coords. not what we want for map
+
+            GameObject.Find("/Camera Local Effects")?.SetActive(false); //leaves and wind lines
 
             try
             {
@@ -145,11 +212,28 @@ namespace Scratch
                 Logger.LogDebug("culler probably already got killed, lol");
             }
 
+            foreach (var lodtree in LODTree.instances)
+            {
+                lodtree.gameObject.GetComponent<LODGroup>().enabled = false;
+                foreach (var cube in lodtree.cubes)
+                {
+                    cube.gameObject.SetActive(false);
+                }
+                foreach (var billboard in lodtree.billboards)
+                {
+                    billboard.gameObject.SetActive(false);
+                }
+                foreach (var low in lodtree.lows)
+                {
+                    low.gameObject.SetActive(false);
+                }
+            }
+
             // var cartoonStandard = Shader.Find("Cartoon/Standard");
             var cartoonStandard = GameObject.Find("/Terrain/Map Signs/Map Sign/Sign").GetComponent<MeshRenderer>().sharedMaterial.shader;
             //var waterBlue = new Color(0.7217f, 0.8067f, 1f, 0.8039f); //original lakewater color
             var waterBlue = new Color(0.522f, 0.698f, 0.859f, 0.8039f);
-            
+
             var ogWaterPlane = GameObject.Find("/Terrain/WaterPlane");
             var lakeWaterMat = ogWaterPlane.GetComponent<MeshRenderer>().sharedMaterial;
             ogWaterPlane.transform.localScale = new Vector3(700, 1, 700);
@@ -168,50 +252,6 @@ namespace Scratch
                 renderer.sharedMaterial.color = waterBlue;
             }
 
-            //NB: no colons allowed in windows filenames
-            //SnapPic(camera, $"{System.DateTime.Now.ToString("s").Replace(':', '-')}-snap", RenderTextureFormat.ARGB32);
-
-            // var potPrefabs = Resources.FindObjectsOfTypeAll<ParticlePickup>()
-            //     .Where(e => e.name.Equals("Pot Confetti"))
-            //     .Select(e => e.gameObject.transform.parent.gameObject);
-
-
-            // var breakables = Object.FindObjectsOfType<BreakableObject>();
-            // var potPositions = breakables.Where(breakable => potPrefabs.Contains(breakable.breakingPrefab)).Select(breakable => breakable.transform.position);
-            // var chestPositions = Object.FindObjectsOfType<BreakableObjectMulti>().Select(bom => bom.transform.position);
-            // var paths = Object.FindObjectsOfType<ActorPathFollower>();
-            // var racePositions = Object.FindObjectsOfType<Racetrack>().Select(racetrack => racetrack.transform.position);
-            // //var NPCs = //uhhhh i really dunno for this one
-
-            // foreach (Vector3 potPos in potPositions)
-            // {
-            //     var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            //     marker.transform.position = new(potPos.x, 90, potPos.z);
-            //     marker.transform.localScale *= 1;
-            //     marker.GetComponent<Renderer>().material.color = Color.cyan;
-            //     markers.Add(marker);
-            // }
-            // foreach (Vector3 chestPos in chestPositions)
-            // {
-            //     var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            //     marker.transform.position = new(chestPos.x, 90, chestPos.z);
-            //     marker.transform.localScale *= 1;
-            //     marker.GetComponent<Renderer>().material.color = Color.magenta;
-            //     markers.Add(marker);
-            // }
-            // foreach (Vector3 racePos in racePositions)
-            // {
-            //     var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            //     marker.transform.position = new(racePos.x, 90, racePos.z);
-            //     marker.transform.localScale *= 1;
-            //     marker.transform.Rotate(0, 45, 0);
-            //     marker.GetComponent<Renderer>().material.color = Color.red;
-            //     markers.Add(marker);
-            // }
-
-
-            // IEnumerator makeTiles()
-            // {
             topLeft = new Vector3(75, 100, 75);
             camera.transform.position = topLeft;
             var orthoSize = 240f; // "radius" (technically only vertical, but i'm doing squares)
@@ -235,7 +275,6 @@ namespace Scratch
                 orthoSize /= 2;
                 topLeft = new Vector3(topLeft.x - orthoSize, 100, topLeft.z + orthoSize);
             }
-            // }
 
 
             //restore

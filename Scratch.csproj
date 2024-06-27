@@ -33,5 +33,8 @@
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>lib/UnityEngine.CoreModule.dll</HintPath>
     </Reference>
+    <Reference Include="Unity.Postprocessing.Runtime">
+      <HintPath>lib/Unity.Postprocessing.Runtime.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>
