@@ -36,5 +36,8 @@
     <Reference Include="Unity.Postprocessing.Runtime">
       <HintPath>lib/Unity.Postprocessing.Runtime.dll</HintPath>
     </Reference>
+    <Reference Include="Rewired_Core">
+      <HintPath>lib/Rewired_Core.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

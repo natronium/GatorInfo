@@ -1,31 +1,37 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using System.Linq;
 using BepInEx;
 using Cinemachine;
-using Mono.Cecil;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.SearchService;
 
 namespace Scratch
 {
     [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
     public class Plugin : BaseUnityPlugin
     {
-        Plugin p;
+        public static Plugin p;
         private void Awake()
         {
             p = this;
             // Plugin startup logic
             Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
             Logger.LogDebug("FLORGLE!");
+            Snapshot();
+        }
 
-            LogStuffPositions();
-            // has to happen out here so we can wait for a bit for the trees to fade back in
-            Game.State = GameState.Menu; // Render tree canopies (technically sets the proximityfade shader var)
-            StartCoroutine(WaitThenRun(5, DoTheThing));
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.F12))
+            {
+                Game.State = GameState.Menu; // Render tree canopies (technically sets the proximityfade shader var)
+                StartCoroutine(WaitThenRun(5, DoTheThing));
+            }
+            if (Input.GetKeyDown(KeyCode.F11))
+            {
+                LogStuffPositions();
+            }
         }
 
         private void OnDestroy()
@@ -53,7 +59,6 @@ namespace Scratch
         private static CinemachineBrain brain;
         private static new Camera camera;
         private static bool isSnapped = false;
-        private static List<GameObject> markers = [];
 
         private static bool killedCuller = false;
 
@@ -91,11 +96,8 @@ namespace Scratch
             camera.farClipPlane = oFarClip;
             RenderSettings.fog = true;
             QualitySettings.lodBias = oLodBias;
+            Game.State = GameState.Play;
 
-            foreach (var marker in markers)
-            {
-                Object.Destroy(marker);
-            }
         }
 
         public void LogStuffPositions()
@@ -106,39 +108,49 @@ namespace Scratch
 
 
             var breakables = Object.FindObjectsOfType<BreakableObject>();
-            var potPositions = breakables.Where(breakable => potPrefabs.Contains(breakable.breakingPrefab)).Select(breakable => breakable.transform.position);
-            var chestPositions = Object.FindObjectsOfType<BreakableObjectMulti>().Select(bom => bom.transform.position);
-            var racePositions = Object.FindObjectsOfType<Racetrack>().Select(racetrack => racetrack.transform.position);
+            var pots = breakables.Where(breakable => potPrefabs.Contains(breakable.breakingPrefab));
+            var chests = Object.FindObjectsOfType<BreakableObjectMulti>();
+            var races = Object.FindObjectsOfType<Racetrack>();
 
-            Logger.LogDebug("let pot_positions = [");
-            foreach (Vector3 pos in potPositions)
+            Logger.LogDebug("let pot_info = [");
+            foreach (var pot in pots)
             {
-                Logger.LogDebug($"[{pos.z},{pos.x}],");
+                var pos = pot.transform.position;
+                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {pot.id}}},");
             }
             Logger.LogDebug("];");
-            Logger.LogDebug("let chest_positions = [");
-            foreach (Vector3 pos in chestPositions)
+            Logger.LogDebug("let chest_info = [");
+            foreach (var chest in chests)
             {
-                Logger.LogDebug($"[{pos.z},{pos.x}],");
+                var pos = chest.transform.position;
+                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {chest.id}}},");
             }
             Logger.LogDebug("];");
-            Logger.LogDebug("let race_positions = [");
-            foreach (Vector3 pos in racePositions)
+            Logger.LogDebug("let race_info = [");
+            foreach (var race in races)
             {
-               Logger.LogDebug($"[{pos.z},{pos.x}],");
+                var pos = race.transform.position;
+                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {race.id}}},");
             }
             Logger.LogDebug("];");
-            Logger.LogDebug("let npc_positions = [");
-            foreach (var npc in CompletionStats.c.completionActors){
+            Logger.LogDebug("let npc_info = [");
+            foreach (var npc in CompletionStats.c.completionActors)
+            {
                 var pos = npc.transform.position;
-                Logger.LogDebug($"[{pos.z},{pos.x}],");
+                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], name:\"{npc.name}\"}},");
             }
             Logger.LogDebug("];");
-            Logger.LogDebug("let npc_path_positions = [");
+            Logger.LogDebug("let npc_path_info = [");
             var paths = Resources.FindObjectsOfTypeAll<ActorPath>();
             foreach (var path in paths)
             {
-                Logger.LogDebug($"L.polyline([");
+                var parentName = path.transform.parent.name;
+                // We don't care about the playground paths, or about awkward mouse's unused island path
+                if (parentName == "Dynamic Character Paths" || path.name == "Island Path")
+                {
+                    continue;
+                }
+                Logger.LogDebug($"{{name:\"{parentName}/{path.name}\", path_points:[ ");
                 for (int i = 0; i < path.positions.Length; i++)
                 {
                     var pos = path.GetPosition(i);
@@ -149,7 +161,7 @@ namespace Scratch
                     var pos = path.GetPosition(0);
                     Logger.LogDebug($"[{pos.z},{pos.x}],");
                 }
-                Logger.LogDebug($"]),");
+                Logger.LogDebug($"]}},");
             }
             Logger.LogDebug("];");
         }
@@ -158,7 +170,6 @@ namespace Scratch
         {
             var restore = false;
             var topLeft = new Vector3(-116, 100, 274);
-            Snapshot();
             UnityEngine.RenderSettings.fog = false;
             camera.farClipPlane = 1e6F;
             camera.orthographic = true;
@@ -182,7 +193,101 @@ namespace Scratch
             camera.GetComponent<UnityEngine.Rendering.PostProcessing.PostProcessLayer>().enabled = false; //changes the screen color based on camera coords. not what we want for map
 
             GameObject.Find("/Camera Local Effects")?.SetActive(false); //leaves and wind lines
+            Logger.LogDebug("Iinitial setup complete");
+            DisableCuller();
 
+            DisableTreeLODs();
+
+            FlattenWater();
+
+            TakeTilePics();
+
+            //restore
+            if (restore)
+            {
+                Restore();
+            }
+
+        }
+
+        public void FlattenWater()
+        {
+            Logger.LogDebug("Flattening Water");
+            // var cartoonStandard = Shader.Find("Cartoon/Standard");
+            var cartoonStandard = GameObject.Find("/Terrain/Map Signs/Map Sign/Sign").GetComponent<MeshRenderer>().sharedMaterial.shader;
+            //var waterBlue = new Color(0.7217f, 0.8067f, 1f, 0.8039f); //original lakewater color
+            var waterBlue = new Color(0.522f, 0.698f, 0.859f, 0.8039f);
+
+            var waterPlane = GameObject.Find("/Terrain/WaterPlane");
+            var lakeWaterMat = waterPlane.GetComponent<MeshRenderer>().sharedMaterial;
+            waterPlane.transform.localScale = new Vector3(700, 1, 700);
+            lakeWaterMat.shader = cartoonStandard;
+            lakeWaterMat.color = waterBlue;
+
+            foreach (var renderer in GameObject.Find("/Terrain/Water").GetComponentsInChildren<MeshRenderer>())
+            {
+                renderer.sharedMaterial.shader = cartoonStandard;
+                renderer.sharedMaterial.color = waterBlue;
+            }
+
+            foreach (var renderer in GameObject.Find("/West (Forest)/West Water").GetComponentsInChildren<MeshRenderer>())
+            {
+                renderer.sharedMaterial.shader = cartoonStandard;
+                renderer.sharedMaterial.color = waterBlue;
+            }
+        }
+
+        public void DisableTreeLODs()
+        {
+            Logger.LogDebug("Disabling tree lods");
+            foreach (var lodtree in LODTree.instances)
+            {
+                lodtree.gameObject.GetComponent<LODGroup>().enabled = false;
+                foreach (var cube in lodtree.cubes)
+                {
+                    cube.gameObject.SetActive(false);
+                }
+                foreach (var billboard in lodtree.billboards)
+                {
+                    billboard.gameObject.SetActive(false);
+                }
+                foreach (var low in lodtree.lows)
+                {
+                    low.gameObject.SetActive(false);
+                }
+            }
+        }
+
+        public void TakeTilePics()
+        {
+            var topLeft = new Vector3(75, 100, 75);
+            camera.transform.position = topLeft;
+            var orthoSize = 240f; // "radius" (technically only vertical, but i'm doing squares)
+            for (int zoomLevel = 0; zoomLevel < 8; zoomLevel++)
+            {
+                long tileCount = 1L << zoomLevel;
+                camera.orthographicSize = orthoSize;
+                camera.transform.position = topLeft;
+                var stepSize = orthoSize * 2;
+                System.IO.Directory.CreateDirectory($"C:\\Users\\na\\Desktop\\LilGatorProject\\MapPics\\Tiles\\{zoomLevel}");
+                for (int x = 0; x < tileCount; x++)
+                {
+                    for (int z = 0; z < tileCount; z++)
+                    {
+                        camera.transform.position = topLeft + new Vector3(x * stepSize, 0, z * -stepSize);
+                        Logger.LogDebug($"{zoomLevel}\\{x}_{z}");
+                        SnapPic(camera, $"{zoomLevel}\\{x}_{z}", RenderTextureFormat.ARGB32);
+                    }
+                }
+
+                orthoSize /= 2;
+                topLeft = new Vector3(topLeft.x - orthoSize, 100, topLeft.z + orthoSize);
+            }
+        }
+
+        public void DisableCuller()
+        {
+            Logger.LogDebug("disabling culler");
             try
             {
                 if (!killedCuller)
@@ -210,77 +315,6 @@ namespace Scratch
             catch (System.NullReferenceException)
             {
                 Logger.LogDebug("culler probably already got killed, lol");
-            }
-
-            foreach (var lodtree in LODTree.instances)
-            {
-                lodtree.gameObject.GetComponent<LODGroup>().enabled = false;
-                foreach (var cube in lodtree.cubes)
-                {
-                    cube.gameObject.SetActive(false);
-                }
-                foreach (var billboard in lodtree.billboards)
-                {
-                    billboard.gameObject.SetActive(false);
-                }
-                foreach (var low in lodtree.lows)
-                {
-                    low.gameObject.SetActive(false);
-                }
-            }
-
-            // var cartoonStandard = Shader.Find("Cartoon/Standard");
-            var cartoonStandard = GameObject.Find("/Terrain/Map Signs/Map Sign/Sign").GetComponent<MeshRenderer>().sharedMaterial.shader;
-            //var waterBlue = new Color(0.7217f, 0.8067f, 1f, 0.8039f); //original lakewater color
-            var waterBlue = new Color(0.522f, 0.698f, 0.859f, 0.8039f);
-
-            var ogWaterPlane = GameObject.Find("/Terrain/WaterPlane");
-            var lakeWaterMat = ogWaterPlane.GetComponent<MeshRenderer>().sharedMaterial;
-            ogWaterPlane.transform.localScale = new Vector3(700, 1, 700);
-            lakeWaterMat.shader = cartoonStandard;
-            lakeWaterMat.color = waterBlue;
-
-            foreach (var renderer in GameObject.Find("/Terrain/Water").GetComponentsInChildren<MeshRenderer>())
-            {
-                renderer.sharedMaterial.shader = cartoonStandard;
-                renderer.sharedMaterial.color = waterBlue;
-            }
-
-            foreach (var renderer in GameObject.Find("/West (Forest)/West Water").GetComponentsInChildren<MeshRenderer>())
-            {
-                renderer.sharedMaterial.shader = cartoonStandard;
-                renderer.sharedMaterial.color = waterBlue;
-            }
-
-            topLeft = new Vector3(75, 100, 75);
-            camera.transform.position = topLeft;
-            var orthoSize = 240f; // "radius" (technically only vertical, but i'm doing squares)
-            for (int zoomLevel = 0; zoomLevel < 8; zoomLevel++)
-            {
-                long tileCount = 1L << zoomLevel;
-                camera.orthographicSize = orthoSize;
-                camera.transform.position = topLeft;
-                var stepSize = orthoSize * 2;
-                System.IO.Directory.CreateDirectory($"C:\\Users\\na\\Desktop\\LilGatorProject\\MapPics\\Tiles\\{zoomLevel}");
-                for (int x = 0; x < tileCount; x++)
-                {
-                    for (int z = 0; z < tileCount; z++)
-                    {
-                        camera.transform.position = topLeft + new Vector3(x * stepSize, 0, z * -stepSize);
-                        Logger.LogDebug($"{zoomLevel}\\{x}_{z}");
-                        SnapPic(camera, $"{zoomLevel}\\{x}_{z}", RenderTextureFormat.ARGB32);
-                    }
-                }
-
-                orthoSize /= 2;
-                topLeft = new Vector3(topLeft.x - orthoSize, 100, topLeft.z + orthoSize);
-            }
-
-
-            //restore
-            if (restore)
-            {
-                Restore();
             }
 
         }
