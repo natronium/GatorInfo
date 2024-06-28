@@ -6,7 +6,7 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Scratch
+namespace GatorInfo
 {
     [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
     public class Plugin : BaseUnityPlugin

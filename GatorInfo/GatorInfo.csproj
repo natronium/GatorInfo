@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyName>Scratch</AssemblyName>
-    <Description>My first plugin</Description>
+    <AssemblyName>GatorInfo</AssemblyName>
+    <Description>Log info and generate map tiles</Description>
     <Version>1.0.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
@@ -39,5 +39,9 @@
     <Reference Include="Rewired_Core">
       <HintPath>lib/Rewired_Core.dll</HintPath>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="NewFolder1\" />
   </ItemGroup>
 </Project>
