@@ -146,7 +146,7 @@ namespace GatorInfo
             {
                 var parentName = path.transform.parent.name;
                 // We don't care about the playground paths, or about awkward mouse's unused island path
-                if (parentName == "Dynamic Character Paths" || path.name == "Island Path")
+                if (parentName == "Dynamic Character Paths" || path.name == "Island Path ")
                 {
                     continue;
                 }
