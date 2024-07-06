@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Linq;
 using BepInEx;
 using Cinemachine;
@@ -102,6 +102,9 @@ namespace GatorInfo
 
         public void LogStuffPositions()
         {
+
+            DisableCuller();
+
             var potPrefabs = Resources.FindObjectsOfTypeAll<ParticlePickup>()
                 .Where(e => e.name.Equals("Pot Confetti"))
                 .Select(e => e.gameObject.transform.parent.gameObject);
