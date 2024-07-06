@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Linq;
 using BepInEx;
 using Cinemachine;
@@ -112,35 +112,44 @@ namespace GatorInfo
             var chests = Object.FindObjectsOfType<BreakableObjectMulti>();
             var races = Object.FindObjectsOfType<Racetrack>();
 
-            Logger.LogDebug("let pot_info = [");
+            Logger.LogDebug("export const pot_info = [");
             foreach (var pot in pots)
             {
                 var pos = pot.transform.position;
-                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {pot.id}}},");
+                var id = pot.id switch
+                {
+                    1606 => 1695,
+                    1638 => 1709,
+                    1663 => 1712,
+
+                    _ => pot.id
+                };
+                var comment = id != pot.id ? $" // {pot.id} => {id} because pot mimic quest" : "";
+                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {id}}},{comment}");
             }
             Logger.LogDebug("];");
-            Logger.LogDebug("let chest_info = [");
+            Logger.LogDebug("export const chest_info = [");
             foreach (var chest in chests)
             {
                 var pos = chest.transform.position;
                 Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {chest.id}}},");
             }
             Logger.LogDebug("];");
-            Logger.LogDebug("let race_info = [");
+            Logger.LogDebug("export const race_info = [");
             foreach (var race in races)
             {
                 var pos = race.transform.position;
                 Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {race.id}}},");
             }
             Logger.LogDebug("];");
-            Logger.LogDebug("let npc_info = [");
+            Logger.LogDebug("export const npc_info = [");
             foreach (var npc in CompletionStats.c.completionActors)
             {
                 var pos = npc.transform.position;
-                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], name:\"{npc.name}\"}},");
+                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], name:\"{npc.profile.name}\", internal_name:\"{npc.name}\"}},");
             }
             Logger.LogDebug("];");
-            Logger.LogDebug("let npc_path_info = [");
+            Logger.LogDebug("export const npc_path_info = [");
             var paths = Resources.FindObjectsOfTypeAll<ActorPath>();
             foreach (var path in paths)
             {
