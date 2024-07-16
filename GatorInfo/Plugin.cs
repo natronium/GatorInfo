@@ -1,4 +1,5 @@
-using System.Collections;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using BepInEx;
 using BepInEx.Logging;
@@ -149,8 +150,29 @@ namespace GatorInfo
                 Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {race.id}}},");
             }
             Logger.LogDebug("];");
+
+            IEnumerable<DialogueActor> additionalActors = ((List<string>)[
+                "/NorthWest (Tutorial Island)/Act 1/Quests/Jill Quest/Studying/Jill",
+                "/NorthWest (Tutorial Island)/Act 1/Quests/Avery Quest/Avery",
+                "/NorthWest (Tutorial Island)/Act 1/Quests/Martin Quest/Horse",
+                "/East (Creeklands)/Cool Kids Quest/Cool CoolKids/Martin",
+                "/East (Creeklands)/Cool Kids Quest/Subquests/Wolf Quest/Coolkid Wolf",
+                "/East (Creeklands)/Cool Kids Quest/Subquests/Boar Quest/Coolkid Boar", // Grass, Bucket, Water, Leaf
+                "/East (Creeklands)/Cool Kids Quest/Subquests/Goose Quest/Coolkid Goose", // detective cowl
+                "/West (Forest)/Prep Quest/Subquests/Engineer/Character/Engineer",
+                "/West (Forest)/Prep Quest/Subquests/Economist/Character/Gene (Economist)",
+                "/West (Forest)/Prep Quest/Subquests/Entomologist/Character/Entomologist",
+                "/West (Forest)/Prep Quest/End Sequence/End Actors/Jill",
+                "/North (Mountain)/Theatre Quest/Subquests/Space!!!/HawkSpace", //Nerf + quest item
+                "/North (Mountain)/Theatre Quest/Subquests/Cowfolk/Cowboy", //cowboy hat?
+                "/North (Mountain)/Theatre Quest/Subquests/Vampire/Vampire Bat", //fangs
+                "/North (Mountain)/Theatre Quest/Subquests/Vampire/IceCream/PartTimer", //parttimer location + npc
+                "/North (Mountain)/Theatre Quest/Introduction/Avery"
+            ]).Select(path => Util.GetByPath(path).GetComponent<DialogueActor>());
+
+
             Logger.LogDebug("export const npc_info = [");
-            foreach (var npc in CompletionStats.c.completionActors)
+            foreach (var npc in (List<DialogueActor>)[.. CompletionStats.c.completionActors, .. additionalActors])
             {
                 var pos = npc.transform.position;
                 Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], name:\"{npc.profile.name}\", internal_name:\"{npc.name}\"}},");
@@ -178,6 +200,27 @@ namespace GatorInfo
                     Logger.LogDebug($"[{pos.z},{pos.x}],");
                 }
                 Logger.LogDebug($"]}},");
+            }
+            Logger.LogDebug("];");
+
+            var singleQuestItems = ((List<(string, string)>)[
+                ("/NorthWest (Tutorial Island)/Act 1/Quests/Jill Quest/Sword Grove (1)/Powerup (Stick)", "Stick Pickup"),
+                ("/NorthWest (Tutorial Island)/Act 1/Quests/Martin Quest/Pickup", "Pot? Pickup"),
+                ("/West (Forest)/Prep Quest/Subquests/Economist/Monsters/ShapeMonster_Square (4)", "Cheese Sandwich Monsters"),
+                ("NorthEast (Canyoney)/SideQuests/FetchVulture/Pickup/ScooterBoard Broken", "Broken Scooter"),
+                ("/East (Creeklands)/Side Quests/Fetch Quest Shark/Retainer Pickup", "Shark Retainer")
+            ]).Select((boop) =>
+            {
+                var (path, name) = boop;
+                return (Util.GetByPath(path).transform, name);
+            });
+            var specialRocks = Util.GetByPath("/West (Forest)/Prep Quest/Subquests/Engineer/Special Rocks").transform.Cast<Transform>().Select((t, i) => (t, $"Special Rock #{i}"));
+            IEnumerable<(Transform, string)> questItems = [.. singleQuestItems, .. specialRocks];
+            Logger.LogDebug("export const quest_item_info =[");
+            foreach (var (questItem, name) in questItems)
+            {
+                var pos = questItem.position;
+                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], name:\"{name}\"}},");
             }
             Logger.LogDebug("];");
         }
@@ -209,7 +252,7 @@ namespace GatorInfo
             camera.GetComponent<UnityEngine.Rendering.PostProcessing.PostProcessLayer>().enabled = false; //changes the screen color based on camera coords. not what we want for map
 
             GameObject.Find("/Camera Local Effects")?.SetActive(false); //leaves and wind lines
-            Logger.LogDebug("Iinitial setup complete");
+            Logger.LogDebug("Initial setup complete");
             DisableCuller();
 
             DisableTreeLODs();
