@@ -1,6 +1,7 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Linq;
 using BepInEx;
+using BepInEx.Logging;
 using Cinemachine;
 using Unity.Collections;
 using UnityEngine;
@@ -12,12 +13,15 @@ namespace GatorInfo
     public class Plugin : BaseUnityPlugin
     {
         public static Plugin p;
+        public static ManualLogSource l;
         private void Awake()
         {
             p = this;
+            l = this.Logger;
             // Plugin startup logic
             Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
-            Logger.LogDebug("FLORGLE!");
+            Logger.LogDebug("Press F11 to log stuff positions");
+            Logger.LogDebug("Press F12 to generate map tiles (WARNING RESOURCE INTENSIVE!)");
             Snapshot();
         }
 
