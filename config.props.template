@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <!-- Default Windows Steam Path -->
+    <!-- <GameDir>C:\Program Files (x86)\Steam\steamapps\common\Lil Gator Game</GameDir> -->
+
+    <!-- Default Linux Steam Path -->
+    <!-- <GameDir>$(HOME)/.local/share/Steam/steamapps/common/Lil Gator Game</GameDir> -->
+
+  </PropertyGroup>
+</Project>

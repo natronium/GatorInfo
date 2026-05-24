@@ -15,32 +15,39 @@
     <RootNamespace>GatorInfo</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup>
+  <!--
+    Copy 'config.props.template' to 'config.props' in the current project directory,
+    and update it so that the 'GameDir' property is the path to your game directory
+	-->
+  <Import Project="config.props" Condition="Exists('config.props')" />
+  <Import Project="BepinexPlugin.targets" />
+
+  <ItemGroup Label="GameDlls">
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(ManagedDir)/Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ManagedDir)/UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="Cinemachine">
+      <HintPath>$(ManagedDir)/Cinemachine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedDir)/UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Postprocessing.Runtime">
+      <HintPath>$(ManagedDir)/Unity.Postprocessing.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Rewired_Core">
+      <HintPath>$(ManagedDir)/Rewired_Core.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Label="Bepinex">
     <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
     <PackageReference Include="BepInEx.Core" Version="5.*" />
     <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
     <PackageReference Include="UnityEngine.Modules" Version="2020.3.23" IncludeAssets="compile" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="Assembly-CSharp">
-      <HintPath>lib/Assembly-CSharp.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine">
-      <HintPath>lib/UnityEngine.dll</HintPath>
-    </Reference>
-    <Reference Include="Cinemachine">
-      <HintPath>lib/Cinemachine.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule">
-      <HintPath>lib/UnityEngine.CoreModule.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.Postprocessing.Runtime">
-      <HintPath>lib/Unity.Postprocessing.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="Rewired_Core">
-      <HintPath>lib/Rewired_Core.dll</HintPath>
-    </Reference>
   </ItemGroup>
 
 </Project>

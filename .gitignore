@@ -3,8 +3,8 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
-# manually sourced libraries
-lib/*.dll
+# custom msbuild config file
+config.props
 
 # custom vscode stuff
 .vscode

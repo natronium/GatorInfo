@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project InitialTargets="CheckForGamedir">
+
+  <PropertyGroup>
+    <ModName>GatorInfo</ModName>
+    <PluginDir>$(GameDir)/BepInEx/plugins/$(ModName)</PluginDir>
+    <ManagedDir>$(GameDir)/Lil Gator Game_Data/Managed</ManagedDir>
+  </PropertyGroup>
+
+  <Target Name="CheckForGamedir">
+
+    <Error Condition="$(GameDir) == ''" Text="%24%28GameDir%29 is undefined. Set up config.props with the game directory's path." />
+    <Error Condition="!Exists($(Gamedir))" Text="Specified %24%28GameDir%29: $(GameDir) does not exist. Make sure %24%28GameDir%29 is pointed to the correct path." />
+
+  </Target>
+
+  <Target Name="CopyMod" DependsOnTargets="Publish" AfterTargets="Publish">
+
+    <ItemGroup>
+      <ModFiles Include="$(PublishDir)/*.dll" />
+      <ModFiles Include="$(PublishDir)/*.pdb" />
+    </ItemGroup>
+
+    <MakeDir Condition="!Exists('$(PluginDir)')" Directories="$(PluginDir)" />
+
+    <Copy SourceFiles="@(ModFiles)" DestinationFolder="$(PluginDir)" />
+  </Target>
+
+  <Target Name="PackageMod" DependsOnTargets="Publish">
+
+    <PropertyGroup>
+      <ZipStagingDir>$(OutDir)/export/</ZipStagingDir>
+      <ZipFilePath>$(OutDir)/$(ModName).zip</ZipFilePath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ZipContentFiles Include="@(ModFiles)" Condition="'%(Extension)' != '.pdb' " />
+      <!-- TODO: Copy Readme/Docs? -->
+      <!-- TODO: Download bepinex and include it? as a separate zip maybe? -->
+    </ItemGroup>
+
+    <!-- Regenerate existing folder to prevent any contamination from last build -->
+    <RemoveDir Directories="$(ZipStagingDir)/" />
+    <Delete Files="$(ZipStagingDir)" />
+
+
+    <MakeDir Directories="$(ZipStagingDir)/$(ModName)" />
+
+    <Copy SourceFiles="@(ModFiles)" DestinationFolder="$(ZipStagingDir)/$(ModName)" />
+
+    <ZipDirectory SourceDirectory="$(ZipStagingDir)" DestinationFile="$(ZipFilePath)" />
+
+  </Target>
+
+</Project>
