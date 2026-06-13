@@ -18,20 +18,25 @@ namespace GatorInfo
         private void Awake()
         {
             p = this;
-            l = this.Logger;
+            l = Logger;
             // Plugin startup logic
             Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
             Logger.LogDebug("Press F11 to log stuff positions");
             Logger.LogDebug("Press F12 to generate map tiles (WARNING RESOURCE INTENSIVE!)");
-            Snapshot();
+            // Snapshot();
         }
 
         private void Update()
         {
+            if (Input.GetKeyDown(KeyCode.F10))
+            {
+                // Snapshot the game
+                Snapshot();
+            }
             if (Input.GetKeyDown(KeyCode.F12))
             {
                 Game.State = GameState.Menu; // Render tree canopies (technically sets the proximityfade shader var)
-                StartCoroutine(WaitThenRun(5, DoTheThing));
+                StartCoroutine(WaitThenRun(5, MakeMapTiles));
             }
             if (Input.GetKeyDown(KeyCode.F11))
             {
@@ -62,7 +67,7 @@ namespace GatorInfo
         private static Transform tf;
         private static GameObject player;
         private static CinemachineBrain brain;
-        private static new Camera camera;
+        private static Camera camera;
         private static bool isSnapped = false;
 
         private static bool killedCuller = false;
@@ -77,12 +82,14 @@ namespace GatorInfo
 
             camera = Camera.main;
             oFarClip = camera.farClipPlane;
-            brain = camera.GetComponent<Cinemachine.CinemachineBrain>();
+            brain = camera.GetComponent<CinemachineBrain>();
             player = GameObject.Find("/Players/Player");
             tf = camera.transform;
             oPos = tf.position;
             oAngle = tf.eulerAngles;
-            terrain = GameObject.Find("/Terrain").GetComponent<Terrain>();
+            // terrain = GameObject.Find("/Terrain").GetComponent<Terrain>(); // island
+            // ug terrain is at /Undground Region/Terrain
+            terrain  = Terrain.activeTerrain;
             oBaseMapDist = terrain.basemapDistance;
             oDetailDist = terrain.detailObjectDistance;
             oLodBias = QualitySettings.lodBias;
@@ -115,27 +122,35 @@ namespace GatorInfo
                 .Select(e => e.gameObject.transform.parent.gameObject);
 
 
-            var breakables = Object.FindObjectsOfType<BreakableObject>();
+            var breakables = FindObjectsByType<BreakableObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             var pots = breakables.Where(breakable => potPrefabs.Contains(breakable.breakingPrefab));
-            var chests = Object.FindObjectsOfType<BreakableObjectMulti>();
-            var races = Object.FindObjectsOfType<Racetrack>();
+            var chests = FindObjectsByType<BreakableObjectMulti>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                            .Where(breakable => breakable.gameObject.name.Contains("Chest"));
+            // var voltageMachines = FindObjectsByType<BreakableObjectMulti>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                            // .Where(breakable => breakable.gameObject.name.Contains("Voltage"));
+            var races = FindObjectsByType<Racetrack>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            var cryptids = FindObjectsByType<CryptidPickup>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            var walls = FindObjectsByType<BatchedBreakableObjects>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            
 
             Logger.LogDebug("export const pot_info = [");
             foreach (var pot in pots)
             {
                 var pos = pot.transform.position;
-                var id = pot.id switch
-                {
-                    1606 => 1695,
-                    1638 => 1709,
-                    1663 => 1712,
+                // var id = pot.id switch
+                // {
+                //     1606 => 1695,
+                //     1638 => 1709,
+                //     1663 => 1712,
 
-                    _ => pot.id
-                };
+                //     _ => pot.id
+                // };
+                var id = pot.id;
                 var comment = id != pot.id ? $" // {pot.id} => {id} because pot mimic quest" : "";
                 Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {id}}},{comment}");
             }
             Logger.LogDebug("];");
+
             Logger.LogDebug("export const chest_info = [");
             foreach (var chest in chests)
             {
@@ -143,6 +158,7 @@ namespace GatorInfo
                 Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {chest.id}}},");
             }
             Logger.LogDebug("];");
+            
             Logger.LogDebug("export const race_info = [");
             foreach (var race in races)
             {
@@ -151,28 +167,58 @@ namespace GatorInfo
             }
             Logger.LogDebug("];");
 
-            IEnumerable<DialogueActor> additionalActors = ((List<string>)[
-                "/NorthWest (Tutorial Island)/Act 1/Quests/Jill Quest/Studying/Jill",
-                "/NorthWest (Tutorial Island)/Act 1/Quests/Avery Quest/Avery",
-                "/NorthWest (Tutorial Island)/Act 1/Quests/Martin Quest/Horse",
-                "/East (Creeklands)/Cool Kids Quest/Cool CoolKids/Martin",
-                "/East (Creeklands)/Cool Kids Quest/Subquests/Wolf Quest/Coolkid Wolf",
-                "/East (Creeklands)/Cool Kids Quest/Subquests/Boar Quest/Coolkid Boar", // Grass, Bucket, Water, Leaf
-                "/East (Creeklands)/Cool Kids Quest/Subquests/Goose Quest/Coolkid Goose", // detective cowl
-                "/West (Forest)/Prep Quest/Subquests/Engineer/Character/Engineer",
-                "/West (Forest)/Prep Quest/Subquests/Economist/Character/Gene (Economist)",
-                "/West (Forest)/Prep Quest/Subquests/Entomologist/Character/Entomologist",
-                "/West (Forest)/Prep Quest/End Sequence/End Actors/Jill",
-                "/North (Mountain)/Theatre Quest/Subquests/Space!!!/HawkSpace", //Nerf + quest item
-                "/North (Mountain)/Theatre Quest/Subquests/Cowfolk/Cowboy", //cowboy hat?
-                "/North (Mountain)/Theatre Quest/Subquests/Vampire/Vampire Bat", //fangs
-                "/North (Mountain)/Theatre Quest/Subquests/Vampire/IceCream/PartTimer", //parttimer location + npc
-                "/North (Mountain)/Theatre Quest/Introduction/Avery"
-            ]).Select(path => Util.GetByPath(path).GetComponent<DialogueActor>());
+            Logger.LogDebug("export const cryptid_info = [");
+            foreach (var cryptid in cryptids)
+            {
+                var pos = cryptid.transform.position;
+                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {cryptid.name}}},");
+            }
+            Logger.LogDebug("];");
 
+            // Logger.LogDebug("export const voltage_machine_info = [");
+            // foreach (var voltageMachine in voltageMachines)
+            // {
+            //     var pos = voltageMachine.transform.position;
+            //     Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {voltageMachine.id}}},");
+            // }
+            // Logger.LogDebug("];");
+
+            Logger.LogDebug("export const wall_info = [");
+            foreach (var wall in walls)
+            {
+                var pos = wall.transform.GetChild(0).position;
+                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], id: {wall.id}}},");
+            }
+            Logger.LogDebug("];");
+
+            // IEnumerable<DialogueActor> additionalActors = ((List<string>)[
+            //     "/NorthWest (Tutorial Island)/Act 1/Quests/Jill Quest/Studying/Jill",
+            //     "/NorthWest (Tutorial Island)/Act 1/Quests/Avery Quest/Avery",
+            //     "/NorthWest (Tutorial Island)/Act 1/Quests/Martin Quest/Horse",
+            //     "/East (Creeklands)/Cool Kids Quest/Cool CoolKids/Martin",
+            //     "/East (Creeklands)/Cool Kids Quest/Subquests/Wolf Quest/Coolkid Wolf",
+            //     "/East (Creeklands)/Cool Kids Quest/Subquests/Boar Quest/Coolkid Boar", // Grass, Bucket, Water, Leaf
+            //     "/East (Creeklands)/Cool Kids Quest/Subquests/Goose Quest/Coolkid Goose", // detective cowl
+            //     "/West (Forest)/Prep Quest/Subquests/Engineer/Character/Engineer",
+            //     "/West (Forest)/Prep Quest/Subquests/Economist/Character/Gene (Economist)",
+            //     "/West (Forest)/Prep Quest/Subquests/Entomologist/Character/Entomologist",
+            //     "/West (Forest)/Prep Quest/End Sequence/End Actors/Jill",
+            //     "/North (Mountain)/Theatre Quest/Subquests/Space!!!/HawkSpace", //Nerf + quest item
+            //     "/North (Mountain)/Theatre Quest/Subquests/Cowfolk/Cowboy", //cowboy hat?
+            //     "/North (Mountain)/Theatre Quest/Subquests/Vampire/Vampire Bat", //fangs
+            //     "/North (Mountain)/Theatre Quest/Subquests/Vampire/IceCream/PartTimer", //parttimer location + npc
+            //     "/North (Mountain)/Theatre Quest/Introduction/Avery",
+            // ]).Select(path => Util.GetByPath(path).GetComponent<DialogueActor>());
+
+            IEnumerable<DialogueActor> additionalActors = ((List<string>)[
+                "Mine/Emilio Quest/Intro Sequence/Emilio (on ceiling)",
+                "Forest/Bear Quest/Quest Characaters/BigBear (1)",
+                "Water/Newt Quest/Characters/Newt",
+            ]).Select(path => Util.GetByPath(path).GetComponent<DialogueActor>());;
 
             Logger.LogDebug("export const npc_info = [");
-            foreach (var npc in (List<DialogueActor>)[.. CompletionStats.c.completionActors, .. additionalActors])
+            //foreach (var npc in (List<DialogueActor>)[.. CompletionStats.c.completionActors, .. additionalActors])
+            foreach (var npc in (List<DialogueActor>)[.. UGCompletionStats.c.completionActors, .. additionalActors])
             {
                 var pos = npc.transform.position;
                 Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], name:\"{npc.profile.name}\", internal_name:\"{npc.name}\"}},");
@@ -203,32 +249,33 @@ namespace GatorInfo
             }
             Logger.LogDebug("];");
 
-            var singleQuestItems = ((List<(string, string)>)[
-                ("/NorthWest (Tutorial Island)/Act 1/Quests/Jill Quest/Sword Grove (1)/Powerup (Stick)", "Stick Pickup"),
-                ("/NorthWest (Tutorial Island)/Act 1/Quests/Martin Quest/Pickup", "Pot? Pickup"),
-                ("/West (Forest)/Prep Quest/Subquests/Economist/Monsters/ShapeMonster_Square (4)", "Cheese Sandwich Monsters"),
-                ("NorthEast (Canyoney)/SideQuests/FetchVulture/Pickup/ScooterBoard Broken", "Broken Scooter"),
-                ("/East (Creeklands)/Side Quests/Fetch Quest Shark/Retainer Pickup", "Shark Retainer")
-            ]).Select((boop) =>
-            {
-                var (path, name) = boop;
-                return (Util.GetByPath(path).transform, name);
-            });
-            var specialRocks = Util.GetByPath("/West (Forest)/Prep Quest/Subquests/Engineer/Special Rocks").transform.Cast<Transform>().Select((t, i) => (t, $"Special Rock #{i}"));
-            IEnumerable<(Transform, string)> questItems = [.. singleQuestItems, .. specialRocks];
-            Logger.LogDebug("export const quest_item_info =[");
-            foreach (var (questItem, name) in questItems)
-            {
-                var pos = questItem.position;
-                Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], name:\"{name}\"}},");
-            }
-            Logger.LogDebug("];");
+            // For Island
+            // var singleQuestItems = ((List<(string, string)>)[
+            //     ("/NorthWest (Tutorial Island)/Act 1/Quests/Jill Quest/Sword Grove (1)/Powerup (Stick)", "Stick Pickup"),
+            //     ("/NorthWest (Tutorial Island)/Act 1/Quests/Martin Quest/Pickup", "Pot? Pickup"),
+            //     ("/West (Forest)/Prep Quest/Subquests/Economist/Monsters/ShapeMonster_Square (4)", "Cheese Sandwich Monsters"),
+            //     ("NorthEast (Canyoney)/SideQuests/FetchVulture/Pickup/ScooterBoard Broken", "Broken Scooter"),
+            //     ("/East (Creeklands)/Side Quests/Fetch Quest Shark/Retainer Pickup", "Shark Retainer")
+            // ]).Select((boop) =>
+            // {
+            //     var (path, name) = boop;
+            //     return (Util.GetByPath(path).transform, name);
+            // });
+            // var specialRocks = Util.GetByPath("/West (Forest)/Prep Quest/Subquests/Engineer/Special Rocks").transform.Cast<Transform>().Select((t, i) => (t, $"Special Rock #{i}"));
+            // IEnumerable<(Transform, string)> questItems = [.. singleQuestItems, .. specialRocks];
+            // Logger.LogDebug("export const quest_item_info =[");
+            // foreach (var (questItem, name) in questItems)
+            // {
+            //     var pos = questItem.position;
+            //     Logger.LogDebug($"{{pos:[{pos.z},{pos.x}], name:\"{name}\"}},");
+            // }
+            // Logger.LogDebug("];");
         }
 
-        public void DoTheThing(/* bool restore = false */)
+        public void MakeMapTiles(/* bool restore = false */)
         {
             var restore = false;
-            var topLeft = new Vector3(-116, 100, 274);
+            var topLeft = new Vector3(-116, 100, 274); // For Island
             UnityEngine.RenderSettings.fog = false;
             camera.farClipPlane = 1e6F;
             camera.orthographic = true;
@@ -251,13 +298,20 @@ namespace GatorInfo
             camera.layerCullDistances = Enumerable.Repeat(0f, 32).ToArray(); //cull nothing!!
             camera.GetComponent<UnityEngine.Rendering.PostProcessing.PostProcessLayer>().enabled = false; //changes the screen color based on camera coords. not what we want for map
 
-            GameObject.Find("/Camera Local Effects")?.SetActive(false); //leaves and wind lines
+            // GameObject.Find("/Camera Local Effects")?.SetActive(false); //leaves and wind lines
+            // // disable UG sprinklespronkles
+            foreach (var effect in FindObjectsByType<FollowMainCamera>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                effect.enabled = false;
+                effect.transform.position = new Vector3(0, 100_000f, 0);
+                effect.gameObject.SetActive(false);
+            }
             Logger.LogDebug("Initial setup complete");
             DisableCuller();
 
-            DisableTreeLODs();
+            // DisableTreeLODs(); // not necessary underground because no LODTrees
 
-            FlattenWater();
+            // FlattenWater();
 
             TakeTilePics();
 
@@ -319,7 +373,8 @@ namespace GatorInfo
 
         public void TakeTilePics()
         {
-            var topLeft = new Vector3(75, 100, 75);
+            // var topLeft = new Vector3(75, 100, 75);
+            var topLeft = new Vector3(-4925, 200, 75);
             camera.transform.position = topLeft;
             var orthoSize = 240f; // "radius" (technically only vertical, but i'm doing squares)
             for (int zoomLevel = 0; zoomLevel < 8; zoomLevel++)
@@ -328,7 +383,7 @@ namespace GatorInfo
                 camera.orthographicSize = orthoSize;
                 camera.transform.position = topLeft;
                 var stepSize = orthoSize * 2;
-                System.IO.Directory.CreateDirectory($"C:\\Users\\na\\Desktop\\LilGatorProject\\MapPics\\Tiles\\{zoomLevel}");
+                System.IO.Directory.CreateDirectory($"Z:\\home\\na\\GatorMapTiles\\Tiles\\{zoomLevel}");
                 for (int x = 0; x < tileCount; x++)
                 {
                     for (int z = 0; z < tileCount; z++)
@@ -352,21 +407,24 @@ namespace GatorInfo
                 if (!killedCuller)
                 {
                     killedCuller = true;
-                    var culler = GameObject.FindObjectOfType<ManualDistanceCulling>();
-                    culler.gameObject.SetActive(false);
-                    foreach (var chunk in culler.chunks)
+                    ManualDistanceCulling[] cullers = FindObjectsByType<ManualDistanceCulling>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                    foreach (ManualDistanceCulling culler in cullers)
                     {
-                        foreach (var obj in chunk.expensiveChunkObjects)
+                        culler.gameObject.SetActive(false);
+                        foreach (var chunk in culler.chunks)
                         {
-                            obj.SetActive(true);
-                        }
-                        foreach (var ro in chunk.resistantObjects)
-                        {
-                            ro.gameObject.SetActive(true);
-                        }
-                        foreach (var obj in chunk.chunkObjects)
-                        {
-                            obj.SetActive(true);
+                            foreach (var obj in chunk.expensiveChunkObjects)
+                            {
+                                obj.SetActive(true);
+                            }
+                            foreach (var ro in chunk.resistantObjects)
+                            {
+                                ro.gameObject.SetActive(true);
+                            }
+                            foreach (var obj in chunk.chunkObjects)
+                            {
+                                obj.SetActive(true);
+                            }
                         }
                     }
                 }
@@ -381,7 +439,7 @@ namespace GatorInfo
         public static void SnapPic(Camera cam, string name, RenderTextureFormat format)
         {
             cam.enabled = false;
-            RenderTexture rt = new(256, 256, 32, format);
+            RenderTexture rt = RenderTexture.GetTemporary(256, 256, 32, format); //new(256, 256, 32, format);
             cam.targetTexture = rt;
             cam.Render();
             cam.targetTexture = null;
@@ -395,11 +453,13 @@ namespace GatorInfo
                 {
                     NativeArray<byte> encoded;
                     encoded = ImageConversion.EncodeNativeArrayToPNG(narray, rt.graphicsFormat, (uint)rt.width, (uint)rt.height);
-                    System.IO.File.WriteAllBytes($"C:\\Users\\na\\Desktop\\LilGatorProject\\MapPics\\Tiles\\{name}.png", encoded.ToArray());
+                    System.IO.File.WriteAllBytes($"Z:\\home\\na\\GatorMapTiles\\Tiles\\{name}.png", encoded.ToArray());
                     encoded.Dispose();
                 }
                 narray.Dispose();
             });
+
+            rt.Release();
         }
         // UnityEngine.RenderSettings.fog = false;
         // clip planes
